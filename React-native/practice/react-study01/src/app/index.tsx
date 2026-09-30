@@ -1,41 +1,51 @@
+import { useTodos } from "@/context/TodoContext";
+import { Link, router } from "expo-router";
 import { useState } from "react";
-import { Pressable, StyleSheet, Text, TextInput, View } from "react-native";
+import {
+  FlatList,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
 
 
-type Todo = {
-  id: string;
-  title: string;
-}
-
+// TodoItemProps : TodoItem 컴포넌트에 전달할 props의 타입 정의
 type TodoItemProps = {
   title: string;
+  done: boolean;
+  onToggle: () => void;
+  onDelete: () => void;
+  onOpen: () => void;
 };
 
-
-
-
-function TodoItem( {title} : TodoItemProps) {
-  const [done, setDone] = useState(false); // 입력창의 글자를 기억하는 State
-
-  return (
-    <Pressable style={styles.item} onPress={() => setDone(!done)}> 
-      <Text style={done ? styles.doneText : undefined}>
-        {done ? "☑" : "☐"} {title}
-      </Text>
-    </Pressable>
-  );
-}
-
-
+// TodoInputProps : TodoInput 컴포넌트에 전달할 props의 타입 정의
 type TodoInputProps = {
   onAdd: (title: string) => void;
 }
 
+/* ======================================================================================================================= */
+// 할 일 목록 컴포넌트
+function TodoItem( {title, done, onToggle, onDelete, onOpen} : TodoItemProps) {
+  // {/* onPress : 할 일 완료 상태 토글, onLongPress : 길게 누르기 이벤트 */}
+  return (
+    <View style={styles.item}>
+      <Pressable style={styles.itemTextArea} onPress={onToggle} onLongPress={onOpen}>  
+        <Text style={done ? styles.doneText : undefined}>
+          {done ? "☑" : "☐"} {title}
+        </Text>
+      </Pressable>
+      <Pressable style={styles.deleteButton} onPress={onDelete}>
+        <Text style={styles.deleteButtonText}>삭제</Text>
+      </Pressable>
+    </View>
+  );
+}
 
-// ① "우" 입력
-// ② onChangeText가 setText("우") 호출
-// ③ React가 text를 "우"로 바꾸고 다시 그림
-// ④ value={text} 이므로 입력창에 "우" 표시
+/* ======================================================================================================================= */
+
+// 할 일 입력창 컴포넌트
 function TodoInput({ onAdd }: TodoInputProps){
   const [text, setText] = useState("");
 
@@ -49,54 +59,75 @@ function TodoInput({ onAdd }: TodoInputProps){
   }
 
   return (
-    // value={text} : 입력창에 입력한 글자를 기억하는 State
-    // onChangeText={setText} : 입력창에 글자를 입력할 때마다 setText 함수가 실행되어 text State를 업데이트
-    // setText("우") -> setText("우유") -> setText("우유 사") -> setText("우유 사기")
-    <View>
       <View style={styles.inputRow}>
         <TextInput
           style={styles.input}
           value={text}    
           onChangeText={setText}
+          onSubmitEditing={handleAdd}
           placeholder="할 일을 입력하세요"
         />
         <Pressable style={styles.addButton} onPress={handleAdd}>
           <Text style={styles.addButtonText}>추가</Text>
         </Pressable>
       </View>
-      <Text style={styles.preview}>입력 중: {text}</Text>
-    </View>
   );
 }
 
-
+/* ======================================================================================================================= */
+/* ======================================================================================================================= */
+// Index 컴포넌트
 export default function Index() {
-  const [todos, setTodos] = useState<Todo[]>([
-    { id: "1", title: "🍞 우유 사기" },
-    { id: "2", title: "🍞 빵 사기" },
-    { id: "3", title: "🥚 계란 사기" },
-  ]);
-
-  function addTodo(title: string) {
-    const newTodo: Todo = {
-      id: Date.now().toString(), 
-      title: title
-    };
-    setTodos([...todos, newTodo]);
-  }
+  const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
+  const doneCount = todos.filter((todo) => todo.done).length;
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>나의 할 일({todos.length})</Text>
+      <Text style={styles.title}>
+        나의 할 일 (완료 {doneCount}/{todos.length})
+      </Text>
+      <Link href="/about" style={styles.link}>
+        앱 정보 보기 ›
+      </Link>
+      <Link href="/sample" style={styles.link}>
+        서버에서 할 일 가져오기 ›
+      </Link>
       <TodoInput onAdd={addTodo} />
-      {
-        todos.map((todo) => (
-          <TodoItem key={todo.id} title={todo.title} />
-        ))
-      }
+      <FlatList
+        data={todos}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <TodoItem
+            title={item.title}
+            done={item.done}
+            onToggle={() => toggleTodo(item.id)}
+            onDelete={() => deleteTodo(item.id)}
+            onOpen={() =>
+              router.push({ pathname: "/todo/[id]", params: { id: item.id } })
+            }
+          />
+        )}
+        ListEmptyComponent={<Text style={styles.empty}>할 일이 없어요 🎉</Text>}
+      />
     </View>
   );
 }
+/* ======================================================================================================================= */
+/* ======================================================================================================================= */
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const styles = StyleSheet.create({
   container: {
@@ -110,14 +141,27 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   item: {
-    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
     backgroundColor: "white",
     borderRadius: 8,
   },
+  itemTextArea: {
+    flex: 1,
+    padding: 12,
+  },
   doneText: {
     color: "gray",
     textDecorationLine: "line-through",
+  },
+  deleteButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+  },
+  deleteButtonText: {
+    color: "tomato",
+    fontWeight: "bold",
   },
   inputRow: {
     flexDirection: "row",
@@ -142,8 +186,13 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontWeight: "bold",
   },
-  preview: {
+  empty: {
     color: "gray",
+    textAlign: "center",
+    marginTop: 40,
+  },
+  link: {
+    color: "royalblue",
     marginBottom: 12,
   },
 });
